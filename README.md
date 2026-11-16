@@ -32,7 +32,7 @@ Autonomous Multi-Agent Adaptive Honeypot - Huawei ICT Competition
 ## 🖥️ Live Prototype Execution (Proof of Concept)
 Below is a live run of the MAS pipeline detecting a high-severity `SQL_Injection` attack, generating a STRIPS plan, calculating Game Theory risk, and updating the Q-Learning table:
 
-![Live Terminal Dashboard](terminal.png)
+![Live Terminal Dashboard](Terminal.png)
 
 ---
 
