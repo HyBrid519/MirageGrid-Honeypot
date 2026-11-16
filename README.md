@@ -11,7 +11,7 @@ Autonomous Multi-Agent Adaptive Honeypot - Huawei ICT Competition
 ---
 
 ## 🏗️ System Architecture
-![MirageGrid MAS Architecture](architecture.jpg)
+![MirageGrid MAS Architecture](diagram.webp)
 
 ---
 
