@@ -1,0 +1,23 @@
+{
+    "SQL_Injection": {
+        "inject_fake_sql_rows": 4.68,
+        "emulate_mysql_error": 2.15,
+        "add_artificial_delay": -1.90
+    },
+    "XSS": {
+        "return_dummy_admin_cookie": 3.85,
+        "render_fake_dom": 1.90
+    },
+    "Directory_Traversal": {
+        "generate_fake_etc_passwd": 5.12,
+        "monitor_file_access": 2.40
+    },
+    "Brute_Force": {
+        "add_artificial_delay": 3.10,
+        "open_decoy_port": 1.25
+    },
+    "Port_Scanning": {
+        "open_decoy_port": 4.05,
+        "record_fingerprint": 2.80
+    }
+}
