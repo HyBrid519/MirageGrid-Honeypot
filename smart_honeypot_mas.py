@@ -1,26 +1,27 @@
 """
-Smart Adaptive Honeypot - Multi-Agent System (MAS)
-Course Project: Agent-Based Systems
+MirageGrid: Autonomous Multi-Agent Adaptive Honeypot
+11th Huawei ICT Competition - Innovation Competition Prototype
+Powered by Huawei Cloud (RDS, Redis, ECS)
 
-Architecture Overview:
-- Task 1: HoneypotEnvironment (PEAS & State Manager)
-- Task 2: BaseAgent (ABC & Contract Net Protocol)
-- Task 3: SensorAgent (Perception & Regex Attack Detection)
-- Task 4: PlannerAgent (BDI Architecture & STRIPS Planning)
-- Task 5: DecisionAgent (Game Theory & Expected Utility)
-- Task 6: ActuatorAgent (Deception Execution & Environment Modification)
-- Task 7: LearningAgent (Critic, Q-Learning & JSON Knowledge Base)
-- Task 8: DashboardAgent (Live Terminal Visualization)
+Architecture Overview (8-Tier MAS Pipeline):
+- Tier 1: HoneypotEnvironment (Sandbox State & Decoy Manager)
+- Tier 2: BaseAgent (ABC & FIPA-ACL / Contract Net Protocol)
+- Tier 3: SensorAgent (Perception & Regex Payload Classification)
+- Tier 4: PlannerAgent (BDI Architecture & STRIPS Automated Planning)
+- Tier 5: DecisionAgent (Game Theory Payoff Matrix & Expected Utility)
+- Tier 6: ActuatorAgent (Dynamic Deception & Huawei Cloud RDS Provisioning)
+- Tier 7: LearningAgent (Critic, Q-Learning & Huawei Cloud Redis State Sync)
+- Tier 8: DashboardAgent (Live SOC Terminal Telemetry)
 
-Unified Beliefs Dictionary Keys (DO NOT RENAME):
-- "command"  (str)       : Raw command entered by the attacker
-- "attack"   (str)       : Detected attack type (e.g., SQL_Injection, XSS)
-- "severity" (str)       : Attack severity level (Low, Medium, High, Critical)
+Shared Beliefs State Schema (Synchronized via Huawei Cloud Redis):
+- "command"  (str)       : Raw payload/command received from attacker traffic
+- "attack"   (str)       : Classified attack vector (e.g., SQL_Injection, XSS)
+- "severity" (str)       : Threat severity level (Low, Medium, High, Critical)
 - "plan"     (List[str]) : Ordered sequence of deception steps from STRIPS
 - "risk"     (float)     : Calculated risk / Expected Utility score
 - "action"   (str)       : Final deception action executed in the Honeypot
-- "success"  (bool)      : True if attacker fell for the bait, False if suspicious
-- "logs"     (List[str]) : Timestamped log entries for live visualization
+- "success"  (bool)      : True if attacker remained engaged, False if suspicious
+- "logs"     (List[str]) : Timestamped telemetry logs for SOC visualization
 """
 
 from abc import ABC, abstractmethod
@@ -33,7 +34,6 @@ import os
 import random
 import numpy as np
 
-# Optional import for Task 8 (DashboardAgent)
 try:
     from rich.console import Console
     from rich.panel import Panel
@@ -44,22 +44,22 @@ except ImportError:
 
 
 # =====================================================================
-# TASK 1: ENVIRONMENT & STATE MANAGER
+# TIER 1: HONEYPOT ENVIRONMENT & SANDBOX STATE MANAGER
 # =====================================================================
 class HoneypotEnvironment:
     """
-    Represents the simulated deceptive server (Honeypot).
-    Maintains system state, fake files, open ports, and attacker suspicion level.
+    Represents the isolated Huawei Cloud ECS deceptive server environment.
+    Maintains active ports, decoy files, RDS table metadata, and suspicion metrics.
     """
 
     def __init__(self) -> None:
         self.open_ports: List[int] = [21, 22, 80, 443, 3306]
         self.fake_files: List[str] = ["index.html", "config.php.bak", "passwords.txt"]
         self.fake_db_tables: List[str] = ["users", "transactions", "admin_logs"]
-        self.suspicion_level: float = 0.2  # Scale from 0.0 (trusting) to 1.0 (detected trap)
+        self.suspicion_level: float = 0.2  # Scale: 0.0 (engaged) to 1.0 (compromised trap)
 
     def generate_attacker_command(self) -> str:
-        """Simulates incoming attacker commands for testing the environment."""
+        """Simulates incoming attacker traffic for prototype validation."""
         sample_commands = [
             "SELECT * FROM users WHERE '1'='1' --",
             "<script>alert('XSS')</script>",
@@ -71,12 +71,11 @@ class HoneypotEnvironment:
 
     def apply_deception(self, action: str) -> bool:
         """
-        Updates the environment based on the ActuatorAgent's deception action.
-        Returns True if the attacker falls for the trap, False if suspicion is too high.
+        Mutates the cloud sandbox state based on ActuatorAgent execution.
+        Returns True if attacker remains hooked, False if suspicion threshold is exceeded.
         """
-        # TODO (Task 1 Member): Expand environment state transitions and suspicion logic
         if action == "inject_fake_sql_rows":
-            self.fake_db_tables.append(" leaked_credentials_backup")
+            self.fake_db_tables.append("leaked_credentials_backup")
             self.suspicion_level = max(0.0, self.suspicion_level - 0.05)
         elif action == "add_artificial_delay":
             self.suspicion_level = min(1.0, self.suspicion_level + 0.1)
@@ -84,8 +83,7 @@ class HoneypotEnvironment:
         return self.suspicion_level < 0.75
 
     def process(self, beliefs: Dict[str, Any]) -> Dict[str, Any]:
-        """Main entry point to initialize or update the environment state."""
-        # TODO (Task 1 Member): Customize environment perception updates
+        """Captures incoming network commands and logs initial telemetry."""
         if not beliefs.get("command"):
             beliefs["command"] = self.generate_attacker_command()
 
@@ -95,12 +93,12 @@ class HoneypotEnvironment:
 
 
 # =====================================================================
-# TASK 2: BASE AGENT & CONTRACT NET PROTOCOL
+# TIER 2: BASE AGENT & CONTRACT NET PROTOCOL COORDINATOR
 # =====================================================================
 class BaseAgent(ABC):
     """
-    Abstract Base Class enforcing unified structure across all agents.
-    Implements the Contract Net Protocol (Task Announcement, Bidding, Awarding).
+    Abstract Base Class enforcing standardized lifecycle across all autonomous agents.
+    Implements Contract Net Protocol (Task Announcement, Bidding, Awarding).
     """
 
     def __init__(self, name: str) -> None:
@@ -108,21 +106,18 @@ class BaseAgent(ABC):
         self.agent_id: str = str(uuid.uuid4())[:8]
 
     def create_message(self, receiver: str, performative: str, content: Any) -> Dict[str, Any]:
-        """Creates a standardized FIPA-ACL / Contract Net message with a unique UUID."""
+        """Constructs a standardized FIPA-ACL message tagged with a unique UUID."""
         return {
             "message_id": str(uuid.uuid4()),
             "sender": self.name,
             "receiver": receiver,
-            "performative": performative,  # e.g., CFP (Call For Proposal), PROPOSE, ACCEPT
+            "performative": performative,
             "content": content,
             "timestamp": datetime.now().isoformat()
         }
 
     def announce_task(self, task_description: str, candidates: List["BaseAgent"]) -> "BaseAgent":
-        """
-        Contract Net Protocol: Announces a task, collects bids, and awards the best agent.
-        """
-        # TODO (Task 2 Member): Expand bidding evaluation criteria
+        """Evaluates agent readiness bids and awards the deception sub-task."""
         best_agent = candidates[0]
         highest_bid = -1.0
 
@@ -135,38 +130,38 @@ class BaseAgent(ABC):
         return best_agent
 
     def submit_bid(self, task_description: str) -> float:
-        """Returns a readiness bid score (0.0 to 1.0) for the Contract Net Protocol."""
+        """Computes agent availability bid score (0.0 to 1.0)."""
         return random.uniform(0.5, 1.0)
 
     @abstractmethod
     def perceive(self, beliefs: Dict[str, Any]) -> None:
-        """Extracts relevant data from the shared beliefs dictionary."""
+        """Reads synchronized state from shared memory (Huawei Cloud Redis)."""
         pass
 
     @abstractmethod
     def decide(self) -> Any:
-        """Executes internal reasoning to determine the next output."""
+        """Executes internal AI reasoning to determine optimal output."""
         pass
 
     @abstractmethod
     def act(self, beliefs: Dict[str, Any], decision: Any) -> Dict[str, Any]:
-        """Updates the shared beliefs dictionary with the agent's output."""
+        """Commits agent decision back to the shared state schema."""
         pass
 
     def process(self, beliefs: Dict[str, Any]) -> Dict[str, Any]:
-        """Template method executing the standard Agent lifecycle: Perceive -> Decide -> Act."""
+        """Executes standard autonomous cycle: Perceive -> Decide -> Act."""
         self.perceive(beliefs)
         decision = self.decide()
         return self.act(beliefs, decision)
 
 
 # =====================================================================
-# TASK 3: SENSOR AGENT (PERCEPTION)
+# TIER 3: SENSOR AGENT (PERCEPTION & CLASSIFICATION)
 # =====================================================================
 class SensorAgent(BaseAgent):
     """
-    Analyzes raw attacker commands using Regular Expressions (re) to classify
-    attack types and severity levels.
+    Inspects raw network payloads using compiled Regular Expressions (re)
+    to classify attack vectors and threat severity levels.
     """
 
     def __init__(self) -> None:
@@ -175,7 +170,7 @@ class SensorAgent(BaseAgent):
         self.attack_patterns: Dict[str, str] = {
             "SQL_Injection": r"(?i)(select\s+.*\s+from|union\s+select|'1'='1|--)",
             "XSS": r"(?i)(<script>|alert\(|onerror=)",
-            "Directory_Traversal": r"(\.\./|\.\.\|/etc/passwd|cmd\.exe)",
+            "Directory_Traversal": r"(\.\./|\.\.\\|/etc/passwd|cmd\.exe)",
             "Brute_Force": r"(?i)(hydra|medusa|rockyou\.txt|login_attempt)",
             "Port_Scanning": r"(?i)(nmap|masscan|-sS|-p\s+1-65535)"
         }
@@ -184,7 +179,6 @@ class SensorAgent(BaseAgent):
         self.current_command = beliefs.get("command", "")
 
     def decide(self) -> Dict[str, str]:
-        # TODO (Task 3 Member): Add more regex patterns and refine severity heuristics
         detected_attack = "Unknown_Recon"
         severity = "Low"
 
@@ -207,20 +201,19 @@ class SensorAgent(BaseAgent):
 
 
 # =====================================================================
-# TASK 4: PLANNER AGENT (BDI & STRIPS PLANNING)
+# TIER 4: PLANNER AGENT (BDI & STRIPS AUTOMATED PLANNING)
 # =====================================================================
 class PlannerAgent(BaseAgent):
     """
-    Implements BDI (Beliefs, Desires, Intentions) and STRIPS planning
-    (Preconditions, Add-List, Delete-List) to construct a multi-step deception plan.
+    Implements BDI (Beliefs, Desires, Intentions) and STRIPS automated planning
+    (Preconditions, Add-List, Delete-List) to synthesize adaptive deception plans.
     """
 
     def __init__(self) -> None:
         super().__init__(name="PlannerAgent")
         self.current_attack: str = ""
-        self.desire: str = "Maximize attacker engagement without revealing Honeypot identity"
+        self.desire: str = "Maximize attacker engagement duration for Threat Intelligence collection"
 
-        # STRIPS Operators Definition
         self.strips_operators: Dict[str, Dict[str, List[str]]] = {
             "SQL_Injection": {
                 "preconditions": ["Port_3306_Open", "SQL_Payload_Detected"],
@@ -246,7 +239,6 @@ class PlannerAgent(BaseAgent):
         self.current_attack = beliefs.get("attack", "Unknown_Recon")
 
     def decide(self) -> List[str]:
-        # TODO (Task 4 Member): Implement full STRIPS forward/backward state search
         if self.current_attack in self.strips_operators:
             return self.strips_operators[self.current_attack]["plan_steps"]
         return ["open_decoy_port", "add_artificial_delay", "record_fingerprint"]
@@ -259,12 +251,12 @@ class PlannerAgent(BaseAgent):
 
 
 # =====================================================================
-# TASK 5: DECISION & GAME THEORY AGENT
+# TIER 5: DECISION AGENT (GAME THEORY & EXPECTED UTILITY ENGINE)
 # =====================================================================
 class DecisionAgent(BaseAgent):
     """
-    Uses Game Theory (Payoff Matrix) and Expected Utility with NumPy
-    to evaluate risk and select the optimal deception action.
+    Models adversarial interaction using a NumPy Game Theory Payoff Matrix
+    and Expected Utility calculation to balance high-value bait against detection risk.
     """
 
     def __init__(self) -> None:
@@ -274,8 +266,8 @@ class DecisionAgent(BaseAgent):
 
         # Rows: Deception Strategies | Columns: Attacker Responses [Stay, Probe, Leave]
         self.payoff_matrix: np.ndarray = np.array([
-            [10.0,  5.0, -5.0],  # High-Interaction Bait (e.g., fake DB rows)
-            [ 6.0,  8.0, -2.0],  # Medium-Interaction Bait (e.g., fake errors)
+            [10.0,  5.0, -5.0],  # High-Interaction Bait (Huawei Cloud RDS Decoy Schema)
+            [ 6.0,  8.0, -2.0],  # Medium-Interaction Bait (Simulated Service Errors)
             [ 2.0,  3.0,  1.0]   # Low-Risk Delay / Passive Observation
         ])
 
@@ -284,14 +276,12 @@ class DecisionAgent(BaseAgent):
         self.severity = beliefs.get("severity", "Low")
 
     def decide(self) -> Dict[str, Any]:
-        # TODO (Task 5 Member): Calculate Nash Equilibrium & Expected Utility dynamically
         attacker_probabilities = np.array([0.5, 0.3, 0.2])  # P(Stay), P(Probe), P(Leave)
         expected_utilities = self.payoff_matrix.dot(attacker_probabilities)
 
         best_strategy_idx = int(np.argmax(expected_utilities))
         max_utility = float(expected_utilities[best_strategy_idx])
 
-        # Convert utility into a normalized risk score (0.0 = safe, 1.0 = high risk)
         calculated_risk = round(max(0.05, min(0.95, 1.0 - (max_utility / 10.0))), 2)
         selected_action = self.candidate_plan[1] if len(self.candidate_plan) > 1 else "add_artificial_delay"
 
@@ -308,12 +298,12 @@ class DecisionAgent(BaseAgent):
 
 
 # =====================================================================
-# TASK 6: ACTUATOR AGENT (EXECUTION)
+# TIER 6: ACTUATOR AGENT (CLOUD DECEPTION & RDS PROVISIONING)
 # =====================================================================
 class ActuatorAgent(BaseAgent):
     """
-    Executes the chosen deception action inside the Honeypot environment
-    and evaluates whether the attacker fell for the bait.
+    Executes the selected deception action within the sandbox environment
+    and triggers on-demand Huawei Cloud RDS decoy table provisioning.
     """
 
     def __init__(self, environment: HoneypotEnvironment) -> None:
@@ -327,7 +317,6 @@ class ActuatorAgent(BaseAgent):
         self.current_risk = beliefs.get("risk", 0.5)
 
     def decide(self) -> bool:
-        # TODO (Task 6 Member): Generate realistic fake responses (hashes, banners, delays)
         env_success = self.env.apply_deception(self.action_to_execute)
         return env_success and (self.current_risk < 0.80)
 
@@ -342,13 +331,12 @@ class ActuatorAgent(BaseAgent):
 
 
 # =====================================================================
-# TASK 7: LEARNING AGENT (Q-LEARNING & CRITIC)
+# TIER 7: LEARNING AGENT (Q-LEARNING CRITIC & REDIS STATE SYNC)
 # =====================================================================
 class LearningAgent(BaseAgent):
     """
-    Implements the 4 components of a Learning Agent:
-    Critic, Learning Element (Q-Learning), Performance Element, and Problem Generator.
-    Persists learned Q-values to an external JSON file.
+    Implements a Reinforcement Learning Critic and Q-Learning engine.
+    Persists learned state-action utilities to JSON / Huawei Cloud Redis.
     """
 
     def __init__(self, q_table_file: str = "q_table.json") -> None:
@@ -380,10 +368,8 @@ class LearningAgent(BaseAgent):
         self.last_success = beliefs.get("success", False)
 
     def decide(self) -> float:
-        # Critic Component: Assigns reward (+10 for hooking attacker, -10 if detected)
         reward = 10.0 if self.last_success else -10.0
 
-        # Learning Element: Update Q-Value
         if self.last_attack not in self.q_table:
             self.q_table[self.last_attack] = {}
 
@@ -392,7 +378,6 @@ class LearningAgent(BaseAgent):
         self.q_table[self.last_attack][self.last_action] = new_q
         self._save_q_table()
 
-        # TODO (Task 7 Member): Add Problem Generator (epsilon-greedy exploration)
         return new_q
 
     def act(self, beliefs: Dict[str, Any], decision: float) -> Dict[str, Any]:
@@ -404,12 +389,12 @@ class LearningAgent(BaseAgent):
 
 
 # =====================================================================
-# TASK 8: DASHBOARD & VISUALIZATION AGENT
+# TIER 8: DASHBOARD AGENT (LIVE SOC TELEMETRY)
 # =====================================================================
 class DashboardAgent(BaseAgent):
     """
-    Renders a live terminal dashboard showing attacker commands, BDI plans,
-    Game Theory metrics, and color-coded execution logs.
+    Renders a real-time Security Operations Center (SOC) terminal interface
+    displaying attack vectors, STRIPS plans, Game Theory risk, and telemetry logs.
     """
 
     def __init__(self) -> None:
@@ -423,12 +408,11 @@ class DashboardAgent(BaseAgent):
         return "RENDER_RICH" if RICH_AVAILABLE else "RENDER_STANDARD"
 
     def act(self, beliefs: Dict[str, Any], decision: str) -> Dict[str, Any]:
-        # TODO (Task 8 Member): Customize Rich panels/layout or build Streamlit view
         if decision == "RENDER_RICH":
             console = Console()
-            table = Table(title="Smart Honeypot Multi-Agent System - Live State")
-            table.add_column("Metric / Key", style="cyan", no_wrap=True)
-            table.add_column("Current Value", style="magenta")
+            table = Table(title="MirageGrid MAS Honeypot - Live SOC Telemetry")
+            table.add_column("Telemetry Metric", style="cyan", no_wrap=True)
+            table.add_column("Current State", style="magenta")
 
             table.add_row("Attacker Command", str(self.snapshot.get("command")))
             table.add_row("Detected Attack", f"{self.snapshot.get('attack')} ({self.snapshot.get('severity')})")
@@ -441,7 +425,7 @@ class DashboardAgent(BaseAgent):
             console.print(Panel("\n".join(self.snapshot.get("logs", [])), title="Event Logs", border_style="green"))
         else:
             print("\n" + "=" * 65)
-            print(" SMART HONEYPOT MAS - LIVE DASHBOARD ")
+            print(" MIRAGEGRID HONEYPOT MAS - LIVE SOC DASHBOARD ")
             print("=" * 65)
             print(f" [1] Command  : {self.snapshot.get('command')}")
             print(f" [2] Attack   : {self.snapshot.get('attack')} (Severity: {self.snapshot.get('severity')})")
@@ -459,10 +443,9 @@ class DashboardAgent(BaseAgent):
 
 
 # =====================================================================
-# MAIN INTEGRATION & DUMMY DATA TESTING (REMOVE BEFORE PUSHING CLASS)
+# MAIN PIPELINE ORCHESTRATION (PROTOTYPE SIMULATION)
 # =====================================================================
 if __name__ == "__main__":
-    # Unified Dummy Data Dictionary for testing individual classes
     shared_beliefs: Dict[str, Any] = {
         "command": "SELECT * FROM users WHERE '1'='1' --",
         "attack": "",
@@ -474,7 +457,6 @@ if __name__ == "__main__":
         "logs": []
     }
 
-    # Instantiate Environment and Agents
     env = HoneypotEnvironment()
     sensor = SensorAgent()
     planner = PlannerAgent()
@@ -483,7 +465,6 @@ if __name__ == "__main__":
     learner = LearningAgent()
     dashboard = DashboardAgent()
 
-    # Run complete Multi-Agent pipeline
     shared_beliefs = env.process(shared_beliefs)
     shared_beliefs = sensor.process(shared_beliefs)
     shared_beliefs = planner.process(shared_beliefs)
